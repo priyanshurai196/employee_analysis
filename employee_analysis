@@ -1,0 +1,86 @@
+import csv
+from datetime import datetime, timedelta
+
+def parse_datetime(datetime_str):
+    if datetime_str:
+        return datetime.strptime(datetime_str, "%m/%d/%Y %I:%M %p")
+    return None
+
+def analyze_employee_data(file_path):
+    # Dictionary to store employee data
+    employees = {}
+
+    try:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            csv_reader = csv.reader(file, delimiter=',', quotechar='"')
+            next(csv_reader)  # Skip header if present
+
+            for row in csv_reader:
+                # Check if there are enough values in the row
+                if len(row) != 11:
+                    print(f"Error: Invalid line in the file. Expected 11 values, got {len(row)}: {row}")
+                    continue
+
+                name, position, start_time, end_time, _, _, _, _, _, _, _ = row
+
+                # Convert start_time and end_time to datetime objects if they are not empty
+                start_datetime = parse_datetime(start_time)
+                end_datetime = parse_datetime(end_time)
+
+                # Skip lines with empty start and end times
+                if start_datetime is None or end_datetime is None:
+                    continue
+
+                # Calculate shift duration
+                shift_duration = end_datetime - start_datetime
+
+                # Store employee data in the dictionary
+                if name not in employees:
+                    employees[name] = {'position': position, 'shifts': []}
+
+                employees[name]['shifts'].append({
+                    'start_time': start_datetime,
+                    'end_time': end_datetime,
+                    'duration': shift_duration
+                })
+
+        # Analyze and print employee details based on specified criteria
+        for name, data in employees.items():
+            consecutive_days = 0
+            less_than_10_hours = False
+            more_than_14_hours = False
+
+            for i in range(len(data['shifts']) - 1):
+                current_shift = data['shifts'][i]
+                next_shift = data['shifts'][i + 1]
+
+                # Check for 7 consecutive days
+                if (next_shift['start_time'] - current_shift['start_time']).days == 1:
+                    consecutive_days += 1
+                else:
+                    consecutive_days = 0
+
+                # Check for less than 10 hours between shifts but greater than 1 hour
+                if (next_shift['start_time'] - current_shift['end_time']).seconds < 36000 and \
+                   (next_shift['start_time'] - current_shift['end_time']).seconds > 3600:
+                    less_than_10_hours = True
+
+                # Check for more than 14 hours in a single shift
+                if current_shift['duration'].seconds > 50400:  # 14 hours in seconds
+                    more_than_14_hours = True
+
+            # Print employee details based on criteria
+            if consecutive_days == 6:
+                print(f"{name} has worked for 7 consecutive days. Position: {data['position']}")
+            if less_than_10_hours:
+                print(f"{name} has less than 10 hours between shifts but greater than 1 hour. Position: {data['position']}")
+            if more_than_14_hours:
+                print(f"{name} has worked for more than 14 hours in a single shift. Position: {data['position']}")
+
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+
+if __name__ == "__main__":
+    # Assuming the input file has the format: Name, Position, StartDateTime, EndDateTime
+    file_path = input("Enter the path to the employee data file (e.g., assignment.csv): ")
+    analyze_employee_data(file_path)
